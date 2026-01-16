@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  background-color: #020617; /* finops-bg */
+  color: #f8fafc; /* finops-text */
+}
+
+@layer base {
+  body {
+    @apply antialiased;
+  }
+}
+
+/* Custom Scrollbar for "Command Center" feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-finops-surface;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-finops-surface/50 rounded-full border border-finops-surface/20 transition-colors hover:bg-finops-primary/50;
+}
