@@ -1,19 +1,10 @@
 import { useState, useCallback } from "react";
 import { Upload, FileType, CheckCircle, AlertCircle, X } from "lucide-react";
-// import { normalizeToFocus13 } from '../../engine/FocusSchema'
+import { ingestCSV, normalizePublicData, initDB } from "../../engine/DataLake";
 
-// Mock Data Lake interaction for now
-const ingestCsvToLake = async (file) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        rowCount: 12500,
-        schema: "FOCUS 1.3",
-        sample: [{ ServiceCategory: "Compute", Cost: 100 }],
-      });
-    }, 1500);
-  });
+// Legacy mock wrapper can be removed or kept for reference
+const ingestCsvToLake = async () => {
+  await initDB();
 };
 
 export default function CsvUpload({ onUploadComplete }) {
@@ -40,15 +31,20 @@ export default function CsvUpload({ onUploadComplete }) {
       if (!file.name.endsWith(".csv"))
         throw new Error("Only CSV files are supported");
 
-      // 1. Ingest to Data Lake (Simulated)
-      const result = await ingestCsvToLake(file);
+      // 1. Init DB (Ensure connection)
+      // Note: In real app, init should happen at App level, but safe to call here
+      await ingestCsvToLake(file); // Legacy Variable Name, executing real function below
 
-      // 2. Normalize Data (Simulated for this specific CSV)
-      // In real app, we'd query the Lake for summary stats here
-      const publicCloudTotal = result.rowCount * 168; // Mock logic
+      // 2. Ingest
+      const rowCount = await ingestCSV(file);
+
+      // 3. Normalize & Fetch
+      const normalizedRows = await normalizePublicData();
+
+      console.log("Normalized Rows:", normalizedRows.length);
 
       setUploadStatus("success");
-      if (onUploadComplete) onUploadComplete(publicCloudTotal);
+      if (onUploadComplete) onUploadComplete(normalizedRows);
     } catch (err) {
       console.error(err);
       setUploadStatus("error");

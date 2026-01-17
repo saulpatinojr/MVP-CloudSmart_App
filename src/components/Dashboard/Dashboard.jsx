@@ -8,13 +8,19 @@ export default function Dashboard({
   privateDcRows,
   onUploadComplete,
 }) {
-  const hasData = publicCloudData.length > 0 || true; // Mock true for now to show visual
+  const hasData = publicCloudData.length > 0;
+
+  // Dynamic Aggregation (No more hardcoded 2.1M)
+  const publicTotal = publicCloudData.reduce(
+    (acc, r) => acc + (r.EffectiveCost || 0),
+    0,
+  );
 
   return (
     <div className="space-y-8 animate-fade-in">
       {/* 1. Top Level Metrics */}
       <section>
-        <SummaryCards privateTotal={privateDcTotal} publicTotal={2100000} />
+        <SummaryCards privateTotal={privateDcTotal} publicTotal={publicTotal} />
       </section>
 
       {/* 2. Main Visualization Grid */}

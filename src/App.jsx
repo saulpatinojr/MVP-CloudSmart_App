@@ -48,32 +48,47 @@ function App() {
       });
   }, []);
 
-  // State
-  const [privateDcData, setPrivateDcData] = useState({
-    hardwareCost: 1900000, // Derived from default clusters
-    usefulLife: 36, // Months
-    powerKwh: 129600, // Derived
-    pue: 1.5,
-    rackCount: 12, // Derived
-    clusters: [
-      {
-        id: "c1",
-        name: "General Compute",
-        type: "compute",
-        rackCount: 10,
-        hardwareCostPerRack: 120000,
-        powerKwPerRack: 10,
-      },
-      {
-        id: "c2",
-        name: "AI Training Pod",
-        type: "ai",
-        rackCount: 2,
-        hardwareCostPerRack: 350000,
-        powerKwPerRack: 40,
-      },
-    ],
+  // Persistent State (Phase 4)
+  const [privateDcData, setPrivateDcData] = useState(() => {
+    try {
+      const saved = localStorage.getItem("privateDcData");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to load scenario:", e);
+    }
+    // Default Initial State
+    return {
+      hardwareCost: 1900000,
+      usefulLife: 36,
+      powerKwh: 129600,
+      pue: 1.5,
+      rackCount: 12,
+      clusters: [
+        {
+          id: "c1",
+          name: "General Compute",
+          type: "compute",
+          rackCount: 10,
+          hardwareCostPerRack: 120000,
+          powerKwPerRack: 10,
+        },
+        {
+          id: "c2",
+          name: "AI Training Pod",
+          type: "ai",
+          rackCount: 2,
+          hardwareCostPerRack: 350000,
+          powerKwPerRack: 40,
+        },
+      ],
+    };
   });
+
+  // Auto-Save Scenario
+  useEffect(() => {
+    localStorage.setItem("privateDcData", JSON.stringify(privateDcData));
+  }, [privateDcData]);
+
   const [publicCloudData, setPublicCloudData] = useState([]); // Normalized FOCUS data (from DB sample)
 
   // Global Derived Metric
