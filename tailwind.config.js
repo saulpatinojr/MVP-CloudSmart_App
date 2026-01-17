@@ -5,13 +5,13 @@ export default {
     extend: {
       colors: {
         finops: {
-          bg: "#020617", // Slate 950
-          surface: "#0f172a", // Slate 900
-          primary: "#06b6d4", // Cyan 500
-          secondary: "#6366f1", // Indigo 500
-          accent: "#10b981", // Emerald 500 (Positive/Savings)
-          danger: "#ef4444", // Red 500 (Alerts)
-          text: "#f8fafc", // Slate 50
+          bg: "#0f172a", // Slate 900 (Lighter than 950)
+          surface: "#1e293b", // Slate 800 (Lighter than 900)
+          primary: "#22d3ee", // Cyan 400 (Brighter pop)
+          secondary: "#818cf8", // Indigo 400
+          accent: "#34d399", // Emerald 400
+          danger: "#f87171", // Red 400
+          text: "#f1f5f9", // Slate 100
           muted: "#94a3b8", // Slate 400
         },
       },

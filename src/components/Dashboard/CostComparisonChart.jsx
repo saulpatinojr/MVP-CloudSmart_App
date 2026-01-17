@@ -97,6 +97,8 @@ export default function CostComparisonChart({ privateData, publicData }) {
             <Bar
               dataKey="Private"
               fill="#6366f1"
+              stroke="#818cf8"
+              strokeWidth={1}
               radius={[0, 4, 4, 0]}
               barSize={20}
               name="Private DC"
@@ -104,6 +106,8 @@ export default function CostComparisonChart({ privateData, publicData }) {
             <Bar
               dataKey="Public"
               fill="#06b6d4"
+              stroke="#22d3ee"
+              strokeWidth={1}
               radius={[0, 4, 4, 0]}
               barSize={20}
               name="Public Cloud"

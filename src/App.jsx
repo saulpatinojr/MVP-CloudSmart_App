@@ -1,216 +1,199 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+// import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   Server,
-  BarChart3,
+  BrainCircuit,
   Settings,
+  Menu,
   Database,
-  Github,
 } from "lucide-react";
-import Configurator from "./components/DigitalTwin/Configurator";
-import CsvUpload from "./components/Ingestion/CsvUpload";
-import ForecastChart from "./components/Intelligence/ForecastChart";
-import AnomalyAlert from "./components/Intelligence/AnomalyAlert";
-import CostComparisonChart from "./components/Dashboard/CostComparisonChart";
-import SummaryCards from "./components/Dashboard/SummaryCards";
-import { InsightGenerator } from "./engine/InsightGenerator";
-import { Forecaster } from "./engine/Forecaster";
+import { initDB } from "./engine/DataLake";
+import { normalizePrivateDcToFocus } from "./engine/FocusSchema";
 
-// Helper to sum costs
-const sumCost = (data) =>
-  data.reduce((acc, curr) => acc + (curr.EffectiveCost || 0), 0);
+// Modular Views
+import Dashboard from "./components/Dashboard/Dashboard";
+import DigitalTwin from "./components/DigitalTwin/DigitalTwin";
+import Intelligence from "./components/Intelligence/Intelligence";
+
+// Navigation Tab Component
+const NavTab = ({ id, label, icon: Icon, active, onClick }) => (
+  <button
+    onClick={() => onClick(id)}
+    className={`
+      flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all relative
+      ${active ? "text-white" : "text-finops-muted hover:text-white"}
+    `}
+  >
+    <Icon className={`w-4 h-4 ${active ? "text-finops-accent" : ""}`} />
+    {label}
+    {active && (
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-finops-accent shadow-[0_0_10px_rgba(45,212,191,0.5)]" />
+    )}
+  </button>
+);
 
 function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("dashboard"); // dashboard, digitaltwin, intelligence
+  const [dbReady, setDbReady] = useState(false);
+  const [dbError, setDbError] = useState(null);
 
-  // Data State
-  const [privateDcData, setPrivateDcData] = useState([]);
-  const [publicCloudData, setPublicCloudData] = useState([]);
+  // Initialize Data Lake
+  useEffect(() => {
+    initDB()
+      .then(() => setDbReady(true))
+      .catch((err) => {
+        console.error("Failed to init Data Lake", err);
+        setDbError(err.message);
+      });
+  }, []);
 
-  // Derived Metrics (Memoized for performance)
-  const privateTotal = useMemo(() => sumCost(privateDcData), [privateDcData]);
-  const publicTotal = useMemo(
-    () => sumCost(publicCloudData),
-    [publicCloudData],
-  );
+  // State
+  const [privateDcData, setPrivateDcData] = useState({
+    hardwareCost: 1900000, // Derived from default clusters
+    usefulLife: 36, // Months
+    powerKwh: 129600, // Derived
+    pue: 1.5,
+    rackCount: 12, // Derived
+    clusters: [
+      {
+        id: "c1",
+        name: "General Compute",
+        type: "compute",
+        rackCount: 10,
+        hardwareCostPerRack: 120000,
+        powerKwPerRack: 10,
+      },
+      {
+        id: "c2",
+        name: "AI Training Pod",
+        type: "ai",
+        rackCount: 2,
+        hardwareCostPerRack: 350000,
+        powerKwPerRack: 40,
+      },
+    ],
+  });
+  const [publicCloudData, setPublicCloudData] = useState([]); // Normalized FOCUS data (from DB sample)
 
-  // AI Insights
-  const anomalies = useMemo(
-    () => InsightGenerator.detectAnomalies(publicCloudData),
-    [publicCloudData],
-  );
-  const executiveSummary = useMemo(
-    () =>
-      InsightGenerator.generateExecutiveSummary(privateDcData, publicCloudData),
-    [privateDcData, publicCloudData],
-  );
-
-  // Forecast (Last 6 months simulated from Public Data -> Next 6 months predicted)
-  const forecast = useMemo(() => {
-    if (publicCloudData.length === 0) return { history: [], projection: [] };
-
-    // Simulate monthly aggregation from raw rows (assuming raw rows might be line items)
-    // For demo, we'll group by month if available, or simulate purely based on row index for now if date missing
-    // Real impl would group by BillingPeriodStart
-
-    // Mocking history for visualization if just one month uploaded
-    const history = [
-      { month: "Jan", cost: publicTotal * 0.9 },
-      { month: "Feb", cost: publicTotal * 0.95 },
-      { month: "Mar", cost: publicTotal * 0.92 },
-      { month: "Apr", cost: publicTotal * 1.05 }, // Spike
-      { month: "May", cost: publicTotal * 0.98 },
-      { month: "Jun", cost: publicTotal }, // Current
-    ];
-
-    const prediction = Forecaster.predict(history, 6);
-
-    return {
-      history,
-      projection: prediction.projections.map((p) => ({
-        month: `Month +${p.monthIndex - 5}`, // relative
-        predictedCost: p.predictedCost,
-      })),
+  // Global Derived Metric
+  // Global Derived Metric
+  const { privateTotal, privateDcRows } = useMemo(() => {
+    // 1. Map App State to Normalizer Inputs
+    const inputs = {
+      totalHardwareCost: privateDcData.hardwareCost,
+      usefulLifeYears: privateDcData.usefulLife / 12,
+      monthlyPowerCost: privateDcData.powerKwh * 0.12, // Assumed $0.12/kWh
     };
-  }, [publicTotal, publicCloudData]);
+
+    // 2. Generate Rows
+    const rows = normalizePrivateDcToFocus(inputs);
+
+    // 3. Calculate Total Effective Cost
+    const total = rows.reduce((acc, r) => acc + r.EffectiveCost, 0);
+
+    return { privateTotal: total, privateDcRows: rows };
+  }, [privateDcData]);
+
+  if (!dbReady && !dbError) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-finops-bg text-white">
+        <div>
+          <Database className="w-12 h-12 text-finops-primary animate-spin" />
+        </div>
+        <h2 className="mt-4 font-light text-finops-muted">
+          Initializing CloudSmart Data Lake...
+        </h2>
+        <p className="text-xs text-finops-muted/50 mt-2">
+          Loading WASM Engines
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-finops-bg text-finops-text font-sans selection:bg-finops-primary/30">
-      {/* Top Navigation Bar */}
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-finops-surface/80 backdrop-blur-md border-b border-white/5 flex items-center px-6 z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-finops-primary to-finops-secondary rounded-lg flex items-center justify-center shadow-lg shadow-finops-primary/20">
-            <Database className="w-5 h-5 text-white" />
+    <div className="min-h-screen bg-finops-bg text-finops-text font-sans selection:bg-finops-accent/30 selection:text-finops-accent">
+      {/* 1. Global Navigation Bar */}
+      <nav className="fixed top-0 left-0 right-0 h-16 bg-finops-surface/80 backdrop-blur-lg border-b border-white/5 z-50 px-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-finops-primary to-finops-accent flex items-center justify-center shadow-lg shadow-finops-primary/20">
+            <span className="font-bold text-white text-lg">C</span>
           </div>
-          <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">
-            CloudSmart{" "}
-            <span className="font-light text-finops-primary">Intelligence</span>
-          </span>
+          <div>
+            <h1 className="text-lg font-bold text-white tracking-tight">
+              CloudSmart{" "}
+              <span className="font-light text-finops-muted">Enterprise</span>
+            </h1>
+          </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-6 text-sm font-medium text-finops-muted">
-          <button
-            onClick={() => setActiveTab("dashboard")}
-            className={`flex items-center gap-2 transition-colors hover:text-white ${activeTab === "dashboard" ? "text-finops-primary" : ""}`}
-          >
-            <LayoutDashboard size={18} />
-            Command Center
+        <div className="flex items-center gap-1">
+          <NavTab
+            id="dashboard"
+            label="Command Center"
+            icon={LayoutDashboard}
+            active={activeTab === "dashboard"}
+            onClick={setActiveTab}
+          />
+          <NavTab
+            id="digitaltwin"
+            label="Infrastructure Model"
+            icon={Server}
+            active={activeTab === "digitaltwin"}
+            onClick={setActiveTab}
+          />
+          <NavTab
+            id="intelligence"
+            label="Intelligence"
+            icon={BrainCircuit}
+            active={activeTab === "intelligence"}
+            onClick={setActiveTab}
+          />
+        </div>
+
+        <div className="flex items-center gap-4">
+          {dbError && (
+            <span className="text-xs text-red-400 border border-red-500/20 px-2 py-1 rounded">
+              DB Error: {dbError}
+            </span>
+          )}
+          <div className="w-px h-6 bg-white/10" />
+          <button className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+            <Settings className="w-5 h-5 text-finops-muted" />
           </button>
-          <button
-            onClick={() => setActiveTab("digitaltwin")}
-            className={`flex items-center gap-2 transition-colors hover:text-white ${activeTab === "digitaltwin" ? "text-finops-primary" : ""}`}
-          >
-            <Server size={18} />
-            Digital Twin
-          </button>
-          <button
-            onClick={() => setActiveTab("analytics")}
-            className={`flex items-center gap-2 transition-colors hover:text-white ${activeTab === "analytics" ? "text-finops-primary" : ""}`}
-          >
-            <BarChart3 size={18} />
-            Forecasting
+          <button className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+            <Menu className="w-5 h-5 text-finops-muted" />
           </button>
         </div>
       </nav>
 
-      {/* Main Content Area */}
-      <main className="pt-24 px-6 pb-12 max-w-[1600px] mx-auto">
-        <div className="min-h-[600px]">
-          {/* TAB: DASHBOARD (Command Center) */}
+      {/* 2. Main Content Area */}
+      <main className="pt-28 pb-12 px-6 max-w-[1600px] mx-auto min-h-screen">
+        <div>
           {activeTab === "dashboard" && (
-            <div className="animate-slide-up space-y-8">
-              <SummaryCards
-                privateTotal={privateTotal}
-                publicTotal={publicTotal}
-              />
-
-              <div className="grid grid-cols-12 gap-6">
-                {/* Main Chart */}
-                <div className="col-span-12 lg:col-span-8">
-                  <CostComparisonChart
-                    privateData={privateDcData}
-                    publicData={publicCloudData}
-                  />
-                </div>
-
-                {/* Upload & Ingestion */}
-                <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-                  <div className="bg-finops-surface/30 border border-white/5 rounded-xl p-6">
-                    <h3 className="text-white font-semibold mb-4">
-                      Data Sources
-                    </h3>
-                    <CsvUpload onUploadComplete={setPublicCloudData} />
-
-                    <div className="mt-4 pt-4 border-t border-white/5">
-                      <div className="flex justify-between items-center text-sm mb-2">
-                        <span className="text-finops-muted">
-                          Private DC Stream
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold ${privateDcData.length > 0 ? "bg-finops-accent/20 text-finops-accent" : "bg-white/5 text-finops-muted"}`}
-                        >
-                          {privateDcData.length > 0 ? "Active" : "Offline"}
-                        </span>
-                      </div>
-                      <div className="text-xs text-finops-muted">
-                        {privateDcData.length > 0
-                          ? `Streaming ${privateDcData.length} utilization metrics via Digital Twin.`
-                          : "Configure in Digital Twin tab to enable comparison."}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quick Insights (Mini) */}
-                  <div className="bg-finops-surface/30 border border-white/5 rounded-xl p-6 flex-1">
-                    <h3 className="text-white font-semibold mb-3">
-                      Executive Summary
-                    </h3>
-                    <div className="space-y-2">
-                      {executiveSummary.map((line, i) => (
-                        <div
-                          key={i}
-                          className="flex gap-2 text-sm text-finops-muted"
-                        >
-                          <div className="w-1 h-1 rounded-full bg-finops-primary mt-2" />
-                          <p>{line}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Dashboard
+              key="dashboard"
+              publicCloudData={publicCloudData}
+              privateDcRows={privateDcRows}
+              privateDcTotal={privateTotal}
+              onUploadComplete={setPublicCloudData}
+            />
           )}
 
-          {/* TAB: DIGITAL TWIN */}
           {activeTab === "digitaltwin" && (
-            <div key="dt" className="animate-slide-up">
-              <Configurator onDataUpdate={setPrivateDcData} />
-            </div>
+            <DigitalTwin
+              key="digitaltwin"
+              privateDcData={privateDcData}
+              setPrivateDcData={setPrivateDcData}
+            />
           )}
 
-          {/* TAB: ANALYTICS */}
-          {activeTab === "analytics" && (
-            <div className="animate-slide-up grid grid-cols-12 gap-6">
-              <div className="col-span-12 lg:col-span-8">
-                <ForecastChart
-                  historicalData={forecast.history}
-                  projectionData={forecast.projection}
-                />
-              </div>
-              <div className="col-span-12 lg:col-span-4 space-y-6">
-                <div className="bg-finops-surface/30 border border-white/5 rounded-xl p-6">
-                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                    <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-finops-danger opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-finops-danger"></span>
-                    </span>
-                    Anomaly Detection
-                  </h3>
-                  <AnomalyAlert anomalies={anomalies} />
-                </div>
-              </div>
-            </div>
+          {activeTab === "intelligence" && (
+            <Intelligence
+              key="intelligence"
+              publicCloudData={publicCloudData}
+              privateDcData={privateDcData}
+            />
           )}
         </div>
       </main>

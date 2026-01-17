@@ -1,58 +1,33 @@
-import { AlertTriangle, AlertOctagon, CheckCircle2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { AlertTriangle } from "lucide-react";
 
-export default function AnomalyAlert({ anomalies }) {
-  if (!anomalies || anomalies.length === 0) {
-    return (
-      <div className="bg-finops-surface/30 p-4 rounded-xl border border-white/5 flex items-center gap-3">
-        <CheckCircle2 className="text-finops-accent w-5 h-5" />
-        <div>
-          <h4 className="text-sm font-medium text-white">
-            No Anomalies Detected
-          </h4>
-          <p className="text-xs text-finops-muted">
-            System spending is within expected baselines.
-          </p>
-        </div>
-      </div>
-    );
-  }
+export default function AnomalyAlert({ anomaly }) {
+  const isHigh = anomaly.impact === "high";
 
   return (
-    <div className="space-y-3">
-      {anomalies.map((anomaly, i) => (
-        <motion.div
-          key={i}
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: i * 0.1 }}
-          className={`
-                    p-4 rounded-xl border backdrop-blur-sm flex gap-3
-                    ${
-                      anomaly.severity === "high"
-                        ? "bg-finops-danger/10 border-finops-danger/30"
-                        : "bg-orange-500/10 border-orange-500/30"
-                    }
-                `}
-        >
-          {anomaly.severity === "high" ? (
-            <AlertOctagon className="text-finops-danger w-5 h-5 shrink-0" />
-          ) : (
-            <AlertTriangle className="text-orange-400 w-5 h-5 shrink-0" />
-          )}
-
-          <div>
-            <h4
-              className={`text-sm font-medium ${anomaly.severity === "high" ? "text-finops-danger" : "text-orange-400"}`}
-            >
-              {anomaly.title}
-            </h4>
-            <p className="text-xs text-finops-muted mt-1 leading-relaxed">
-              {anomaly.message}
-            </p>
+    <div
+      className={`
+            bg-finops-surface border-l-2 p-3 rounded-r-lg flex items-center justify-between text-sm
+            hover:bg-white/5 transition-colors cursor-pointer group animate-fade-in
+            ${isHigh ? "border-finops-danger" : "border-finops-warning"}
+        `}
+    >
+      <div className="flex items-center gap-3">
+        <AlertTriangle
+          className={`w-4 h-4 ${isHigh ? "text-finops-danger" : "text-finops-warning"}`}
+        />
+        <div>
+          <div className="text-white font-medium">{anomaly.resource}</div>
+          <div className="text-xs text-finops-muted">
+            Unexpected Usage Spike
           </div>
-        </motion.div>
-      ))}
+        </div>
+      </div>
+
+      <div
+        className={`font-mono font-bold ${isHigh ? "text-finops-danger" : "text-finops-warning"}`}
+      >
+        {anomaly.delta}
+      </div>
     </div>
   );
 }
